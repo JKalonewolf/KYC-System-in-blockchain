@@ -1,0 +1,71 @@
+.kyc-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 90vh;
+  background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+}
+
+.kyc-card {
+  background: #ffffff;
+  padding: 35px 45px;
+  border-radius: 15px;
+  box-shadow: 0px 15px 25px rgba(0, 0, 0, 0.2);
+  width: 450px;
+}
+
+.kyc-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.kyc-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #555;
+  font-weight: 500;
+}
+
+.kyc-input {
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kyc-input:focus {
+  border-color: #8e44ad;
+  box-shadow: 0 0 8px rgba(142, 68, 173, 0.3);
+  outline: none;
+}
+
+.kyc-button {
+  width: 100%;
+  padding: 12px;
+  background: #8e44ad;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.kyc-button:hover {
+  background: #732d91;
+}
+
+.kyc-message {
+  margin-top: 15px;
+  color: #27ae60;
+  text-align: center;
+  font-weight: 500;
+}

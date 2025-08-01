@@ -1,198 +1,156 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode"; // ✅ ADD THIS IMPORT
 import "../styles/BankDashboard.css";
 
 function BankDashboard() {
-  const [kycRequests, setKycRequests] = useState([]);
-  const [filteredStatus, setFilteredStatus] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [kycData, setKycData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
   const navigate = useNavigate();
 
-  // ✅ Protect route: only bank role allowed
-  useEffect(() => {
+  const fetchKycData = async () => {
     const token = localStorage.getItem("token");
-    if (!token) return navigate("/login");
 
-    const decoded = jwtDecode(token);
-    if (decoded.role !== "bank") {
-      navigate("/kyc");
-    }
-  }, [navigate]);
-
-  // ✅ Existing logic to fetch KYC requests
-  useEffect(() => {
-    const fetchKYCRequests = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch("http://localhost:5000/api/kyc/all", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.status === 401) {
-          navigate("/login");
-        }
-
-        const data = await response.json();
-        setKycRequests(data);
-      } catch (err) {
-        console.error("Failed to fetch KYC requests:", err);
-      }
-    };
-
-    fetchKYCRequests();
-  }, [navigate]);
-
-  // ... rest of your existing code remains unchanged ...
-
-
-  const handleStatusChange = async (id, status) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:5000/api/kyc/update/${id}`, {
+      const res = await fetch("http://localhost:5000/api/kyc/all", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem("token");
+        navigate("/login");
+        return;
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        setKycData(data);
+        setFilteredData(data);
+      } else {
+        console.warn("Failed to fetch KYC data:", data.message);
+      }
+    } catch (error) {
+      console.error("Error fetching KYC data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKycData();
+  }, []);
+
+  useEffect(() => {
+    const filtered = kycData.filter((item) => {
+      const matchSearch = item.fullName.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === "All" || item.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+    setFilteredData(filtered);
+  }, [search, statusFilter, kycData]);
+
+  const handleStatusUpdate = async (id, newStatus) => {
+    const token = localStorage.getItem("token");
+    const record = kycData.find((item) => item._id === id);
+
+    if (!record?.customerWalletAddress) {
+      alert("❌ Customer wallet address is missing");
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/kyc/update/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status: newStatus,
+          customerWalletAddress: record.customerWalletAddress,
+        }),
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (response.ok) {
-        setKycRequests((prev) =>
-          prev.map((req) => (req._id === id ? { ...req, status } : req))
-        );
-        alert(`✅ KYC ${status} successfully`);
+      if (res.ok) {
+        alert(`✅ KYC ${newStatus}ed successfully`);
+        fetchKycData();
       } else {
-        alert(`❌ ${data.message}`);
+        alert(`❌ Failed: ${data.message}`);
       }
     } catch (err) {
-      console.error("Failed to update KYC:", err);
+      console.error("Update error:", err.message);
+      alert("❌ Error updating KYC status");
     }
   };
 
-  const handleViewSelfie = (selfieUrl) => {
-    window.open(selfieUrl, "_blank", "width=600,height=600");
-  };
-
-  // Filter and search logic
-  const filteredAndSearchedRequests = kycRequests
-    .filter((req) =>
-      filteredStatus === "all" ? true : req.status === filteredStatus
-    )
-    .filter((req) =>
-      req.fullName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredAndSearchedRequests.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
-  const totalPages = Math.ceil(filteredAndSearchedRequests.length / itemsPerPage);
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
+  if (loading) return <div className="dashboard-container">Loading...</div>;
 
   return (
     <div className="dashboard-container">
-      <h2 className="dashboard-title">Bank Dashboard - KYC Requests</h2>
+      <div className="dashboard-card">
+        <h2>🏦 Bank Dashboard</h2>
 
-      {/* Filter and Search */}
-      <div className="dashboard-controls">
-        <select
-          value={filteredStatus}
-          onChange={(e) => setFilteredStatus(e.target.value)}
-        >
-          <option value="all">All</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
+        <div className="dashboard-controls">
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="All">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
 
-        <input
-          type="text"
-          placeholder="Search by name"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {/* Table */}
-      <table className="dashboard-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Address</th>
-            <th>Document</th>
-            <th>Document Number</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {currentItems.map((kyc) => (
-            <tr key={kyc._id}>
-              <td>{kyc.fullName}</td>
-              <td>{kyc.address}</td>
-              <td>{kyc.documentType}</td>
-              <td>{kyc.documentNumber}</td>
-              <td>
-                <span
-                  className={`status-tag ${kyc.status.toLowerCase()}`}
-                >
-                  {kyc.status}
-                </span>
-              </td>
-              <td>
-                <button
-                  className="action-button approve"
-                  onClick={() => handleStatusChange(kyc._id, "approved")}
-                  disabled={kyc.status === "approved"}
-                >
-                  Approve
-                </button>
-                <button
-                  className="action-button reject"
-                  onClick={() => handleStatusChange(kyc._id, "rejected")}
-                  disabled={kyc.status === "rejected"}
-                >
-                  Reject
-                </button>
-                <button
-                  className="action-button view"
-                  onClick={() => handleViewSelfie(kyc.selfieUrl)}
-                >
-                  View Selfie
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Pagination */}
-      <div className="pagination">
-        <button onClick={handlePrevPage} disabled={currentPage === 1}>
-          Previous
-        </button>
-        <span>
-          Page {currentPage} of {totalPages}
-        </span>
-        <button onClick={handleNextPage} disabled={currentPage === totalPages}>
-          Next
-        </button>
+        {filteredData.length > 0 ? (
+          <div className="table-responsive">
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Document</th>
+                  <th>Wallet</th>
+                  <th>Status</th>
+                  <th>Selfie</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredData.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.fullName}</td>
+                    <td>{item.documentType}: {item.documentNumber}</td>
+                    <td className="wallet-cell">{item.customerWalletAddress || "—"}</td>
+                    <td>
+                      <span className={`status-tag ${item.status?.toLowerCase()}`}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td>
+                      {item.selfieUrl ? (
+                        <a href={item.selfieUrl} target="_blank" rel="noopener noreferrer">View</a>
+                      ) : "N/A"}
+                    </td>
+                    <td className="action-buttons">
+                      <button className="btn approve" onClick={() => handleStatusUpdate(item._id, "Approved")}>✅ Approve</button>
+                      <button className="btn reject" onClick={() => handleStatusUpdate(item._id, "Rejected")}>❌ Reject</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p>No KYC records found.</p>
+        )}
       </div>
     </div>
   );

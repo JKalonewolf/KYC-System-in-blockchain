@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\Users\\jayak.DESKTOP-VJI11RA\\blockchain-kyc\\smart-contracts\\contracts\\KYC.sol": {
-      "lastModificationDate": 1753346307612,
-      "contentHash": "a2a5463c685d6b64cb2d1592d72c63ca",
+      "lastModificationDate": 1754012189342,
+      "contentHash": "4082ef799141a6f279ce46cc0f08b6aa",
       "sourceName": "contracts/KYC.sol",
       "solcConfig": {
         "version": "0.8.20",

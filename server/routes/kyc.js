@@ -4,6 +4,20 @@ const authMiddleware = require('../middleware/auth');
 const KYC = require('../models/KYC');
 const User = require('../models/User');
 const blockchainService = require('../services/blockchainService');
+const authenticateUser = require('../middleware/authenticateUser'); // ✅ ADD THIS LINE
+const KYCModel = require("../models/KYC"); 
+// ✅ Your new working route:
+router.get('/my', authenticateUser, async (req, res) => {
+    try {
+        const walletAddress = req.user.walletAddress;
+        const kyc = await KYCModel.findOne({ walletAddress });
+        if (!kyc) return res.status(404).json({ error: 'No KYC record found' });
+        res.json(kyc);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error fetching KYC' });
+    }
+});
 // 📥 Customer submits KYC request
 router.post('/submit', authMiddleware, async (req, res) => {
     const {
@@ -89,6 +103,26 @@ router.get('/test', authMiddleware, (req, res) => {
         message: '✅ KYC API is working!',
         user: req.user, // Send back user info from token
     });
+});
+
+// ✅ Backend route for customer to get their own KYC
+router.get('/my', authenticateUser, async (req, res) => {
+    try {
+        const walletAddress = req.user.walletAddress;  // or however your user is stored
+        const kyc = await KYCModel.findOne({ walletAddress });
+        if (!kyc) return res.status(404).json({ error: 'No KYC record found' });
+        res.json(kyc);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error fetching KYC' });
+    }
+});
+
+router.get("/my", authenticateUser, async (req, res) => {
+  const userId = req.user.id;
+  const kyc = await KYCModel.findOne({ user: userId });
+  if (!kyc) return res.status(404).json({ message: "No KYC data found" });
+  res.json(kyc);
 });
 
 module.exports = router;

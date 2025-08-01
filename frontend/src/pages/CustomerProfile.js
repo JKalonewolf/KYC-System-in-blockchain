@@ -1,27 +1,26 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // 👈 Import useNavigate
+import { useNavigate } from "react-router-dom";
 import "../styles/CustomerProfile.css";
 
 function CustomerProfile() {
   const [userData, setUserData] = useState(null);
-  const [kycList, setKycList] = useState([]);
+  const [kycData, setKycData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const navigate = useNavigate(); // 👈 Initialize navigate
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndKYC = async () => {
       const token = localStorage.getItem("token");
-
-      // 🔒 Redirect to login if no token
       if (!token) {
         console.warn("No token found, redirecting to login");
-        navigate("/login"); // 👈 send user to login page
+        navigate("/login");
         return;
       }
 
       try {
+        // Fetch user profile
         const res = await fetch("http://localhost:5000/api/auth/profile", {
           headers: {
             "Content-Type": "application/json",
@@ -29,78 +28,87 @@ function CustomerProfile() {
           },
         });
 
-        if (res.status === 401 || res.status === 403) {
-          // 🔑 Token expired or invalid → redirect to login
-          console.warn("Token expired or invalid, redirecting to login");
-          localStorage.removeItem("token"); // clean up token
-          navigate("/login");
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            console.warn("Unauthorized. Redirecting to login.");
+            localStorage.removeItem("token");
+            navigate("/login");
+            return;
+          }
+          const errData = await res.json();
+          setError(errData.message || "⚠️ Failed to fetch profile");
           return;
         }
 
         const data = await res.json();
-        console.log("Fetched profile data:", data); // 👈 Debug
+        setUserData(data);
 
-        if (res.ok && data) {
-          setUserData(data.user || data); // fallback for API response shape
-          setKycList(data.kycs || []);
-        } else {
-          setError(data.message || "⚠️ Failed to fetch profile");
+        // Fetch KYC info
+        const kycRes = await fetch("http://localhost:5000/api/kyc/my", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (kycRes.ok) {
+          const kycJson = await kycRes.json();
+          setKycData(kycJson);
+        } else if (kycRes.status !== 404) {
+          const errJson = await kycRes.json();
+          setError(errJson.message || "❌ Failed to fetch KYC data");
         }
       } catch (err) {
-        console.error("Error fetching profile:", err);
+        console.error("Error fetching data:", err);
         setError("❌ Server error. Please try again later.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [navigate]); // 👈 add navigate to deps
+    fetchProfileAndKYC();
+    const interval = setInterval(fetchProfileAndKYC, 10000);
+    return () => clearInterval(interval);
+  }, [navigate]);
 
-  // 🕑 Loading state
   if (loading) return <div className="profile-container">Loading...</div>;
-
-  // ❌ Error state
   if (error) return <div className="profile-container error">{error}</div>;
-
-  // 🕵️‍♂️ No user data fallback
-  if (!userData) return (
-    <div className="profile-container">
-      <p>No user data found. Please try re-logging in.</p>
-    </div>
-  );
+  if (!userData) return <div className="profile-container">No user data found. Please re-login.</div>;
 
   return (
     <div className="profile-container">
       <div className="profile-card">
         <h2>👤 Customer Profile</h2>
-        <p><strong>Name:</strong> {userData?.name}</p>
-        <p><strong>Email:</strong> {userData?.email}</p>
-        <p><strong>Role:</strong> {userData?.role}</p>
+        <p><strong>Name:</strong> {userData.name}</p>
+        <p><strong>Email:</strong> {userData.email}</p>
+        <p><strong>Role:</strong> {userData.role}</p>
 
-        <h3>📂 KYC Submissions</h3>
-        {kycList.length > 0 ? (
-          <table className="kyc-table">
-            <thead>
-              <tr>
-                <th>Document Type</th>
-                <th>Status</th>
-                <th>Submitted On</th>
-                <th>View</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kycList.map((kyc) => (
-                <tr key={kyc._id}>
-                  <td>{kyc.documentType}</td>
-                  <td className={`status-${kyc.status?.toLowerCase()}`}>
-                    {kyc.status}
+        <h3>📂 KYC Status</h3>
+        {kycData ? (
+          <>
+            <table className="kyc-table">
+              <thead>
+                <tr>
+                  <th>Document Type</th>
+                  <th>Document Number</th>
+                  <th>Status</th>
+                  <th>Consent</th>
+                  <th>Submitted On</th>
+                  <th>Selfie</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{kycData.documentType}</td>
+                  <td>{kycData.documentNumber}</td>
+                  <td className={`status-${kycData.status?.toLowerCase()}`}>
+                    {kycData.status}
                   </td>
-                  <td>{kyc.createdAt ? new Date(kyc.createdAt).toLocaleDateString() : "N/A"}</td>
+                  <td>{kycData.consentGiven ? "✅ Yes" : "❌ No"}</td>
+                  <td>{kycData.createdAt ? new Date(kycData.createdAt).toLocaleDateString() : "N/A"}</td>
                   <td>
-                    {kyc.selfieUrl ? (
+                    {kycData.selfieUrl ? (
                       <a
-                        href={kyc.selfieUrl}
+                        href={`http://localhost:5000/${kycData.selfieUrl}`}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -111,11 +119,28 @@ function CustomerProfile() {
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+
+            {kycData.selfieUrl && (
+              <div className="selfie-preview">
+                <h4>📸 Uploaded Selfie</h4>
+                <img
+                  src={`http://localhost:5000/${kycData.selfieUrl}`}
+                  alt="Uploaded Selfie"
+                  style={{
+                    width: "150px",
+                    height: "150px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                    marginTop: "10px"
+                  }}
+                />
+              </div>
+            )}
+          </>
         ) : (
-          <p>No KYC submissions found.</p>
+          <p>📭 No KYC submitted yet.</p>
         )}
       </div>
     </div>

@@ -205,3 +205,71 @@
   background-color: #ccc;
   cursor: not-allowed;
 }
+
+
+/* Responsive tweaks */
+.table-responsive {
+  overflow-x: auto;
+}
+
+@media screen and (max-width: 768px) {
+  .dashboard-table thead {
+    display: none;
+  }
+
+  .dashboard-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .dashboard-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  .dashboard-table td::before {
+    content: attr(data-label);
+    font-weight: bold;
+  }
+
+  .dashboard-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dashboard-controls input,
+  .dashboard-controls select {
+    width: 100%;
+  }
+}
+
+/* Styled badges */
+.status-tag {
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.status-tag.pending {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.status-tag.approved {
+  background-color: #22c55e;
+  color: white;
+}
+
+.status-tag.rejected {
+  background-color: #ef4444;
+  color: white;
+}

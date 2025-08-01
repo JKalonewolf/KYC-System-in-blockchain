@@ -8,7 +8,7 @@ contract KYC {
 
     struct KYCRecord {
         address user;
-        string documentHash; // Hash of off-chain KYC document (IPFS hash or similar)
+        string documentHash;
         KYCStatus status;
         bool consentGiven;
     }
@@ -27,40 +27,40 @@ contract KYC {
 
     constructor() {
         admin = msg.sender;
+        // Optional: Emit admin for debugging
+        emit AdminSet(admin);
     }
 
-    // 🔥 Admin can store KYC on behalf of a user
-    function storeKycData(address _user, string memory _documentHash) external onlyAdmin {
-        kycRecords[_user] = KYCRecord({
-            user: _user,
-            documentHash: _documentHash,
-            status: KYCStatus.Pending,
-            consentGiven: false
-        });
-        emit KYCSubmitted(_user, _documentHash);
-    }
+    event AdminSet(address indexed newAdmin);
 
-    // 🔐 User can self-submit their own KYC
+    // 🔐 User submits hashed KYC document
     function submitKYC(string memory _documentHash) external {
+        require(bytes(_documentHash).length > 0, "Document hash cannot be empty");
+
         kycRecords[msg.sender] = KYCRecord({
             user: msg.sender,
             documentHash: _documentHash,
             status: KYCStatus.Pending,
             consentGiven: false
         });
+
         emit KYCSubmitted(msg.sender, _documentHash);
     }
 
-    // ✅ Admin approves KYC
+    // ✅ Admin approves a submitted KYC
     function approveKYC(address _user) external onlyAdmin {
         require(kycRecords[_user].user != address(0), "KYC record not found");
+        require(kycRecords[_user].status == KYCStatus.Pending, "KYC already processed");
+
         kycRecords[_user].status = KYCStatus.Approved;
         emit KYCApproved(_user);
     }
 
-    // ❌ Admin rejects KYC
+    // ❌ Admin rejects a submitted KYC
     function rejectKYC(address _user) external onlyAdmin {
         require(kycRecords[_user].user != address(0), "KYC record not found");
+        require(kycRecords[_user].status == KYCStatus.Pending, "KYC already processed");
+
         kycRecords[_user].status = KYCStatus.Rejected;
         emit KYCRejected(_user);
     }
@@ -68,17 +68,19 @@ contract KYC {
     // 🔄 User updates consent
     function updateConsent(bool _consentGiven) external {
         require(kycRecords[msg.sender].user != address(0), "KYC record not found");
+
         kycRecords[msg.sender].consentGiven = _consentGiven;
         emit ConsentUpdated(msg.sender, _consentGiven);
     }
 
-    // 📥 View KYC data
+    // 📥 Admin or user can fetch KYC data
     function getKYC(address _user) external view returns (
         string memory documentHash,
         KYCStatus status,
         bool consentGiven
     ) {
         require(kycRecords[_user].user != address(0), "No KYC record found for this address");
+
         KYCRecord memory record = kycRecords[_user];
         return (record.documentHash, record.status, record.consentGiven);
     }
